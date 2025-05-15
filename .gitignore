@@ -1,0 +1,57 @@
+# Виртуальное окружение
+venv/
+env/
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.ini
+*.dll
+
+# Логи и файлы данных
+logs/
+*.log
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# IDE / Редакторы
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# БД (если используешь SQLite локально)
+*.sqlite
+*.db
+
+# Данные Prometheus (локальные)
+data/
+
+# Артефакты CI/CD
+__pycache__
+.DS_Store
+*.pyc
+
+# Docker
+docker-compose.override.yml
+*.log
