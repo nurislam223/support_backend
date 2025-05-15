@@ -19,7 +19,13 @@ from prometheus_fastapi_instrumentator import Instrumentator
 # Создаем таблицы в БД
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(
+    swagger_ui_init_oauth={
+        "usePkceWithAuthorizationCodeGrant": True,
+        "clientId": "1",
+        "scopes": {}
+    }
+)
 
 # Подключаем мониторинг Prometheus
 Instrumentator().instrument(app).expose(app)
