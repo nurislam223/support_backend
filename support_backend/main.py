@@ -6,7 +6,6 @@ import models
 import schemas
 from database import SessionLocal, engine
 from auth import (
-    oauth2_scheme,
     get_current_user,
     create_access_token,
     authenticate_user
@@ -19,13 +18,12 @@ from prometheus_fastapi_instrumentator import Instrumentator
 # Создаем таблицы в БД
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    swagger_ui_init_oauth={
-        "usePkceWithAuthorizationCodeGrant": True,
-        "clientId": "1",
-        "scopes": {}
-    }
-)
+# CORS
+middleware = [
+    Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"])
+]
+
+app = FastAPI(middleware=middleware)
 
 # Подключаем мониторинг Prometheus
 Instrumentator().instrument(app).expose(app)
