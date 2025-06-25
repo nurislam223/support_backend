@@ -12,6 +12,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копируем исходный код приложения
 COPY ./support_backend .
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY wait-for-db-and-migrate.sh /usr/local/bin/wait-for-db-and-migrate.sh
 
 RUN chmod +x /usr/local/bin/wait-for-db-and-migrate.sh
