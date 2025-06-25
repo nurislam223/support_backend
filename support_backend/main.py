@@ -127,3 +127,95 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: dict 
     db.commit()
     return {"detail": "User deleted"}
 
+### PROFILES ###
+@app.post("/profiles/", response_model=schemas.ProfileResponse)
+def create_profile(profile: schemas.ProfileCreate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    log_action(current_user["username"], "create_profile", f"User ID: {profile.user_id}")
+    db_profile = models.Profile(**profile.dict())
+    db.add(db_profile)
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile
+
+@app.get("/profiles/{profile_id}", response_model=schemas.ProfileResponse)
+def read_profile(profile_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    log_action(current_user["username"], "get_profile_by_id", f"ID: {profile_id}")
+    profile = db.query(models.Profile).filter(models.Profile.id == profile_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return profile
+
+@app.put("/profiles/{profile_id}", response_model=schemas.ProfileResponse)
+def update_profile(profile_id: int, profile: schemas.ProfileUpdate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    log_action(current_user["username"], "update_profile", f"ID: {profile_id}")
+    db_profile = db.query(models.Profile).filter(models.Profile.id == profile_id).first()
+    if not db_profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    for key, value in profile.dict().items():
+        setattr(db_profile, key, value)
+
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile
+
+@app.delete("/profiles/{profile_id}")
+def delete_profile(profile_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    log_action(current_user["username"], "delete_profile", f"ID: {profile_id}")
+    db_profile = db.query(models.Profile).filter(models.Profile.id == profile_id).first()
+    if not db_profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    db.delete(db_profile)
+    db.commit()
+    return {"detail": "Profile deleted"}
+
+### ORDERS ###
+@app.post("/orders/", response_model=schemas.OrderResponse)
+def create_order(order: schemas.OrderCreate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    log_action(current_user["username"], "create_order", f"User ID: {order.user_id}")
+    db_order = models.Order(**order.dict())
+    db.add(db_order)
+    db.commit()
+    db.refresh(db_order)
+    return db_order
+
+@app.get("/orders/{order_id}", response_model=schemas.OrderResponse)
+def read_order(order_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    log_action(current_user["username"], "get_order_by_id", f"ID: {order_id}")
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return order
+
+@app.get("/users/{user_id}/orders", response_model=List[schemas.OrderResponse])
+def read_orders_by_user(user_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    log_action(current_user["username"], "read_orders_by_user", f"User ID: {user_id}")
+    orders = db.query(models.Order).filter(models.Order.user_id == user_id).all()
+    return orders
+
+@app.put("/orders/{order_id}", response_model=schemas.OrderResponse)
+def update_order(order_id: int, order: schemas.OrderUpdate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    log_action(current_user["username"], "update_order", f"ID: {order_id}")
+    db_order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not db_order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    for key, value in order.dict().items():
+        setattr(db_order, key, value)
+
+    db.commit()
+    db.refresh(db_order)
+    return db_order
+
+@app.delete("/orders/{order_id}")
+def delete_order(order_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    log_action(current_user["username"], "delete_order", f"ID: {order_id}")
+    db_order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not db_order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    db.delete(db_order)
+    db.commit()
+    return {"detail": "Order deleted"}
+
