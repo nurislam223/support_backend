@@ -5,12 +5,8 @@ from typing import List
 import models
 import schemas
 from database import SessionLocal, engine
-from auth import (
-    get_current_user,
-    create_access_token,
-    authenticate_user
-)
-from logger import log_action
+from auth import get_current_user, create_access_token, authenticate_user
+from logger import log_request  # Обновили импорт
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -77,11 +73,16 @@ def login(username: str, password: str):
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     token = create_access_token(data={"sub": user["username"]})
+    log_request(user["username"], "POST", "/token", details="Login successful")
     return {"access_token": token, "token_type": "bearer"}
+
+
+### USERS ###
+
 
 @app.post("/users/", response_model=schemas.UserResponse)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "create_user", f"Email: {user.email}")
+    log_request(current_user["username"], "POST", "/users/", body=user.dict())
     db_user = models.User(**user.dict())
     db.add(db_user)
     db.commit()
@@ -90,13 +91,13 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), current
 
 @app.get("/users/", response_model=List[schemas.UserResponse])
 def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "read_users", f"Skip: {skip}, Limit: {limit}")
+    log_request(current_user["username"], "GET", "/users/", details=f"Skip: {skip}, Limit: {limit}")
     users = db.query(models.User).offset(skip).limit(limit).all()
     return users
 
 @app.get("/users/{user_id}", response_model=schemas.UserResponse)
 def read_user(user_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "get_user_by_id", f"ID: {user_id}")
+    log_request(current_user["username"], "GET", f"/users/{user_id}", details=f"ID: {user_id}")
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -104,7 +105,7 @@ def read_user(user_id: int, db: Session = Depends(get_db), current_user: dict = 
 
 @app.put("/users/{user_id}", response_model=schemas.UserResponse)
 def update_user(user_id: int, user: schemas.UserUpdate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "update_user", f"ID: {user_id}")
+    log_request(current_user["username"], "PUT", f"/users/{user_id}", body=user.dict())
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -118,7 +119,7 @@ def update_user(user_id: int, user: schemas.UserUpdate, db: Session = Depends(ge
 
 @app.delete("/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "delete_user", f"ID: {user_id}")
+    log_request(current_user["username"], "DELETE", f"/users/{user_id}", details=f"ID: {user_id}")
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -127,10 +128,12 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: dict 
     db.commit()
     return {"detail": "User deleted"}
 
+
 ### PROFILES ###
+
 @app.post("/profiles/", response_model=schemas.ProfileResponse)
 def create_profile(profile: schemas.ProfileCreate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "create_profile", f"User ID: {profile.user_id}")
+    log_request(current_user["username"], "POST", "/profiles/", body=profile.dict())
     db_profile = models.Profile(**profile.dict())
     db.add(db_profile)
     db.commit()
@@ -139,7 +142,7 @@ def create_profile(profile: schemas.ProfileCreate, db: Session = Depends(get_db)
 
 @app.get("/profiles/{profile_id}", response_model=schemas.ProfileResponse)
 def read_profile(profile_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "get_profile_by_id", f"ID: {profile_id}")
+    log_request(current_user["username"], "GET", f"/profiles/{profile_id}", details=f"ID: {profile_id}")
     profile = db.query(models.Profile).filter(models.Profile.id == profile_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
@@ -147,7 +150,7 @@ def read_profile(profile_id: int, db: Session = Depends(get_db), current_user: d
 
 @app.put("/profiles/{profile_id}", response_model=schemas.ProfileResponse)
 def update_profile(profile_id: int, profile: schemas.ProfileUpdate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "update_profile", f"ID: {profile_id}")
+    log_request(current_user["username"], "PUT", f"/profiles/{profile_id}", body=profile.dict())
     db_profile = db.query(models.Profile).filter(models.Profile.id == profile_id).first()
     if not db_profile:
         raise HTTPException(status_code=404, detail="Profile not found")
@@ -161,7 +164,7 @@ def update_profile(profile_id: int, profile: schemas.ProfileUpdate, db: Session 
 
 @app.delete("/profiles/{profile_id}")
 def delete_profile(profile_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "delete_profile", f"ID: {profile_id}")
+    log_request(current_user["username"], "DELETE", f"/profiles/{profile_id}", details=f"ID: {profile_id}")
     db_profile = db.query(models.Profile).filter(models.Profile.id == profile_id).first()
     if not db_profile:
         raise HTTPException(status_code=404, detail="Profile not found")
@@ -170,10 +173,12 @@ def delete_profile(profile_id: int, db: Session = Depends(get_db), current_user:
     db.commit()
     return {"detail": "Profile deleted"}
 
+
 ### ORDERS ###
+
 @app.post("/orders/", response_model=schemas.OrderResponse)
 def create_order(order: schemas.OrderCreate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "create_order", f"User ID: {order.user_id}")
+    log_request(current_user["username"], "POST", "/orders/", body=order.dict())
     db_order = models.Order(**order.dict())
     db.add(db_order)
     db.commit()
@@ -182,7 +187,7 @@ def create_order(order: schemas.OrderCreate, db: Session = Depends(get_db), curr
 
 @app.get("/orders/{order_id}", response_model=schemas.OrderResponse)
 def read_order(order_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "get_order_by_id", f"ID: {order_id}")
+    log_request(current_user["username"], "GET", f"/orders/{order_id}", details=f"ID: {order_id}")
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -190,13 +195,13 @@ def read_order(order_id: int, db: Session = Depends(get_db), current_user: dict 
 
 @app.get("/users/{user_id}/orders", response_model=List[schemas.OrderResponse])
 def read_orders_by_user(user_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "read_orders_by_user", f"User ID: {user_id}")
+    log_request(current_user["username"], "GET", f"/users/{user_id}/orders", details=f"User ID: {user_id}")
     orders = db.query(models.Order).filter(models.Order.user_id == user_id).all()
     return orders
 
 @app.put("/orders/{order_id}", response_model=schemas.OrderResponse)
 def update_order(order_id: int, order: schemas.OrderUpdate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "update_order", f"ID: {order_id}")
+    log_request(current_user["username"], "PUT", f"/orders/{order_id}", body=order.dict())
     db_order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not db_order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -210,7 +215,7 @@ def update_order(order_id: int, order: schemas.OrderUpdate, db: Session = Depend
 
 @app.delete("/orders/{order_id}")
 def delete_order(order_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    log_action(current_user["username"], "delete_order", f"ID: {order_id}")
+    log_request(current_user["username"], "DELETE", f"/orders/{order_id}", details=f"ID: {order_id}")
     db_order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not db_order:
         raise HTTPException(status_code=404, detail="Order not found")
