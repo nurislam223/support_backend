@@ -2,10 +2,10 @@ from fastapi import Request, Response
 from logger import log_request
 from typing import Callable
 
-async def log_requests_middleware(request: Request, call_next: Callable) -> Response:
-    # Получаем пользователя из токена (если есть)
+async def log_requests_middleware(request: Request, call_next):
+    # Получаем пользователя из request.state.user
     try:
-        user = request.state.user.get("username", "-")
+        user = getattr(request.state, "user", {}).get("username", "-")
     except:
         user = "-"
 
@@ -20,8 +20,7 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
         user=user,
         method=method,
         endpoint=endpoint,
-        status=response.status_code,
-        body=None  # Тело ответа можно добавить, если нужно
+        status=response.status_code
     )
 
     return response
