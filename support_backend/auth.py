@@ -1,7 +1,6 @@
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import jwt
-from jwt.exceptions import JWTError
+from jose import jwt, JWTError
 
 # Инициализируем схему Bearer токена
 bearer_scheme = HTTPBearer()
