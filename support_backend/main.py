@@ -9,6 +9,7 @@ from auth import get_current_user, create_access_token, authenticate_user
 import logger  
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
+from middleware import log_requests_middleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Создаем таблицы в БД
@@ -21,7 +22,8 @@ logger = logger.setup_logger()
 
 # CORS
 middleware = [
-    Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"])
+    Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"]),
+    Middleware(log_requests_middleware)
 ]
 
 app = FastAPI(middleware=middleware)

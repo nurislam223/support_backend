@@ -1,39 +1,37 @@
-from fastapi.security import HTTPBearer
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt
+from jwt.exceptions import JWTError
 
-# Схема для Bearer токена
+# Инициализируем схему Bearer токена
 bearer_scheme = HTTPBearer()
 
-SECRET_KEY = "your-secret-key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
+# Пример БД (заменить на реальную)
 fake_users_db = {
-    "admin": {
-        "username": "admin",
-        "password": "secret",
-        "role": "admin"
-    }
+    "admin": {"username": "admin", "password": "secret"}
 }
 
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+# Секретный ключ и алгоритм
+SECRET_KEY = "your-secret-key"
+ALGORITHM = "HS256"
 
-def get_current_user(token: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+def get_current_user(
+    request: Request,  # Добавляем request, чтобы сохранить юзера в state
+    token: HTTPAuthorizationCredentials = Depends(bearer_scheme)
+):
     try:
         payload = jwt.decode(token.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token")
+        
         user = fake_users_db.get(username)
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+        
+        # 💡 Сохраняем пользователя в request.state для последующего логирования
+        request.state.user = user
+        
         return user
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
