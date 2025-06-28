@@ -6,3 +6,4 @@ pydantic
 python-jose[cryptography]
 prometheus-fastapi-instrumentator
 psycopg2-binary
+jwt
