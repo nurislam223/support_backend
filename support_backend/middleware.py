@@ -2,9 +2,9 @@ from fastapi import Request, Response
 from logger import log_request
 from typing import Callable
 
-async def log_requests_middleware(request: Request, call_next: Callable) -> Response:
+async def log_requests_middleware(request: Request, call_next: Callable[..., Response]) -> Response:
     try:
-        user = getattr(request.state, "user", {}).get("username", "-")
+        user = request.state.user.get("username", "-")
     except:
         user = "-"
 
