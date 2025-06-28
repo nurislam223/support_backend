@@ -6,13 +6,18 @@ import models
 import schemas
 from database import SessionLocal, engine
 from auth import get_current_user, create_access_token, authenticate_user
-from logger import log_request  # Обновили импорт
+import logger  
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Создаем таблицы в БД
 models.Base.metadata.create_all(bind=engine)
+
+log_request = logger.log_request
+
+logger = logger.setup_logger()
+
 
 # CORS
 middleware = [
