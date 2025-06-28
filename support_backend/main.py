@@ -19,14 +19,17 @@ log_request = logger.log_request
 
 logger = logger.setup_logger()
 
+app = FastAPI()
 
-# CORS
-middleware = [
-    Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"]),
-    Middleware(log_requests_middleware)
-]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-app = FastAPI(middleware=middleware)
+# Регистрируем middleware для логирования
+app.middleware("http")(log_requests_middleware)
 
 # Подключаем мониторинг Prometheus
 Instrumentator().instrument(app).expose(app)
