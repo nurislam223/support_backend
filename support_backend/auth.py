@@ -1,18 +1,29 @@
-from fastapi import Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt, JWTError
+from fastapi.security import HTTPBearer
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import HTTPAuthorizationCredentials
 
-# Инициализируем схему Bearer токена
+# Схема для Bearer токена
 bearer_scheme = HTTPBearer()
 
-# Пример БД (заменить на реальную)
-fake_users_db = {
-    "admin": {"username": "admin", "password": "secret"}
-}
-
-# Секретный ключ и алгоритм
 SECRET_KEY = "your-secret-key"
 ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+fake_users_db = {
+    "admin": {
+        "username": "admin",
+        "password": "secret",
+        "role": "admin"
+    }
+}
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def get_current_user(
     request: Request,  # Добавляем request, чтобы сохранить юзера в state
