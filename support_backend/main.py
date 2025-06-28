@@ -83,7 +83,7 @@ def login(username: str, password: str):
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     token = create_access_token(data={"sub": user["username"]})
-    log_request(user["username"], "POST", "/token", details="Login successful")
+    log_request(user["username"], "POST", "/token", status=200, details="Login successful")
     return {"access_token": token, "token_type": "bearer"}
 
 
