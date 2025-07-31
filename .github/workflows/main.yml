@@ -1,0 +1,30 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main  # или другая ветка, например 'prod'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1.0.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/support_backend
+            echo "🔽 Stopping containers..."
+            docker-compose down
+            echo "📥 Pulling latest code..."
+            git pull origin main
+            echo "🚀 Starting containers..."
+            docker-compose up -d
+            echo "✅ Deployment successful!"
