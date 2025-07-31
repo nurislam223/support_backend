@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - main  # или другая ветка, например 'prod'
+      - main
 
 jobs:
   deploy:
@@ -20,15 +20,23 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
             cd /root/support_backend
+            echo "📁 In directory: $(pwd)"
+            echo "🔧 Docker: $(docker --version)"
+            echo "🔧 Compose: $(docker-compose --version 2>/dev/null || docker compose version)"
+
             echo "🔽 Stopping containers..."
-            docker-compose down
+            docker-compose down || docker compose down
+
             echo "📥 Pulling latest code..."
             git pull origin main
+
             echo "🚀 Starting containers..."
-            docker-compose up -d
+            docker-compose up -d || docker compose up -d
+
             echo "✅ Deployment successful!"
           timeout: 30s
-          command_timeout: 10m
+          command_timeout: 15m
           proxy_port: 22
           proxy_timeout: 30s
