@@ -9,7 +9,7 @@ bearer_scheme = HTTPBearer()
 
 SECRET_KEY = "your-secret-key"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 3600
+ACCESS_TOKEN_EXPIRE_DAYS = 3650
 
 fake_users_db = {
     "admin": {
