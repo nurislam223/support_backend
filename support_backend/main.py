@@ -1,7 +1,7 @@
 import json
 import logging
 from fastapi import FastAPI, Depends, HTTPException, status, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List
 import models
@@ -9,11 +9,9 @@ import schemas
 from database import SessionLocal, engine
 from auth import get_current_user, create_access_token, authenticate_user
 from logger import setup_logger
-from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from middleware import log_requests_middleware
 from prometheus_fastapi_instrumentator import Instrumentator
-import time
 
 # Инициализируем логгер ДО создания app
 setup_logger()
@@ -21,7 +19,12 @@ setup_logger()
 # Создаем таблицы в БД
 models.Base.metadata.create_all(bind=engine)
 
+# Создаём приложение
 app = FastAPI()
+
+# === Добавляем middleware ===
+# Важно: логирующий мидлварь — первым!
+app.middleware("http")(log_requests_middleware)
 
 # CORS
 app.add_middleware(
@@ -80,7 +83,7 @@ async def read_home(request: Request):
 async def login(request: Request, username: str, password: str):
     user = authenticate_user(username, password)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     token = create_access_token(data={"sub": user["username"]})
     return {"access_token": token, "token_type": "bearer"}
