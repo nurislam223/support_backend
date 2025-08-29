@@ -16,6 +16,8 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
     try:
         if request.method not in ("GET", "HEAD") and request.headers.get("content-length"):
             body = await request.body()
+            request._body = body
+
             try:
                 decoded = body.decode("utf-8")
                 if decoded.strip():
@@ -28,30 +30,42 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
     except Exception as e:
         request_body = f"<error_reading_body: {str(e)}>"
 
-    # === Обработка запроса ===
-    response = await call_next(request)
+    # === Определение пользователя ===
+    user = "anonymous"
+    client_ip = request.client.host if request.client else "-"
 
-    # === ПЕРЕХВАТ ТЕЛА ОТВЕТА ПРОСТЫМ СПОСОБОМ ===
+    # === Обработка запроса и перехват ответа ===
     response_body = None
     try:
-        # Для стандартных JSON ответов
-        if hasattr(response, "body") and response.body:
+        # Вызываем следующий middleware/обработчик
+        response = await call_next(request)
+
+        # === ПЕРЕХВАТ ТЕЛА ОТВЕТА ===
+        # Для этого нам нужно прочитать response.body
+        if hasattr(response, 'body') and response.body:
             try:
-                # Пытаемся получить тело ответа
-                body_content = response.body
-                if isinstance(body_content, bytes):
-                    decoded = body_content.decode("utf-8")
-                    if decoded.strip():
-                        try:
-                            response_body = json.loads(decoded)
-                        except json.JSONDecodeError:
-                            response_body = decoded
-                elif isinstance(body_content, str):
-                    response_body = body_content
+                response_body_bytes = response.body
+                if response_body_bytes:
+                    try:
+                        decoded = response_body_bytes.decode("utf-8")
+                        if decoded.strip():
+                            try:
+                                response_body = json.loads(decoded)
+                            except json.JSONDecodeError:
+                                response_body = decoded
+                    except Exception:
+                        response_body = "<binary_response>"
             except Exception as e:
-                response_body = f"<error: {str(e)}>"
+                response_body = f"<error_reading_response: {str(e)}>"
+
     except Exception as e:
-        response_body = f"<unable_to_read: {str(e)}>"
+        logger.exception("Unhandled exception in request flow")
+        response = Response(
+            content=json.dumps({"detail": "Internal Server Error"}),
+            status_code=500,
+            media_type="application/json"
+        )
+        response_body = {"detail": "Internal Server Error"}
 
     process_time = time.time() - start_time
 
