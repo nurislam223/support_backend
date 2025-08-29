@@ -52,6 +52,25 @@ def setup_logger():
 
     return logger
 
+SENSITIVE_KEYS = {"password", "passwd", "secret", "token", "api_key", "authorization", "refresh_token"}
+
+
+def mask_sensitive_data(data, keys=SENSITIVE_KEYS):
+    """
+    Рекурсивно маскирует чувствительные поля в словаре или списке.
+    """
+    if isinstance(data, dict):
+        result = {}
+        for k, v in data.items():
+            if k.lower() in keys:
+                result[k] = "***MASKED***"
+            else:
+                result[k] = mask_sensitive_data(v, keys)
+        return result
+    elif isinstance(data, list):
+        return [mask_sensitive_data(item, keys) for item in data]
+    else:
+        return data
 
 def log_request(user: str, method: str, endpoint: str, status: int,
                 details: str = "", request_body: dict = None, response_body: dict = None):
