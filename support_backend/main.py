@@ -13,31 +13,45 @@ from fastapi.middleware.cors import CORSMiddleware
 from middleware import log_requests_middleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
-# Инициализируем логгер ДО создания app
+# === 1. Настройка логгера ===
 setup_logger()
 
-# Создаем таблицы в БД
+# === 2. Создание таблиц ===
 models.Base.metadata.create_all(bind=engine)
 
-# Создаём приложение
-app = FastAPI()
+# === 3. Создание приложения ===
+app = FastAPI(
+    title="Support Backend API",
+    description="API for user management and support system",
+    version="1.0.0"
+)
 
-# === Добавляем middleware ===
-# Важно: логирующий мидлварь — первым!
+# === 4. ПОДКЛЮЧАЕМ MIDDLEWARE В ПРАВИЛЬНОМ ПОРЯДКЕ ===
+
+# ВАЖНО: логирующий middleware — первым!
 app.middleware("http")(log_requests_middleware)
 
 # CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Подключаем мониторинг Prometheus
-Instrumentator().instrument(app).expose(app)
+# === 5. Подключаем Prometheus ПОСЛЕ middleware ===
+# Это добавит /metrics, но мы хотим, чтобы он тоже логировался
+instrumentator = Instrumentator()
+instrumentator.instrument(app)
+# Вместо .expose(app), мы используем обычный маршрут, чтобы он прошёл через middleware
+@app.get("/metrics")
+def metrics():
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+    from fastapi.responses import Response
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
-# Зависимость для получения сессии БД
+# === 6. Зависимость для БД ===
 def get_db():
     db = SessionLocal()
     try:
@@ -46,6 +60,7 @@ def get_db():
         db.close()
 
 
+# === 7. Маршруты ===
 @app.get("/", response_class=HTMLResponse)
 async def read_home(request: Request):
     html_content = """
