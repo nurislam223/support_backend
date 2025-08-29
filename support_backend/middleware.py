@@ -16,7 +16,6 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
     try:
         if request.method not in ("GET", "HEAD") and request.headers.get("content-length"):
             body = await request.body()
-            # Сохраняем для повторного использования
             request._body = body
 
             try:
@@ -37,37 +36,32 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
 
     # === Обработка запроса с перехватом ответа ===
     response_body = None
+    response = None
+
     try:
-        # Вызываем следующий middleware/обработчик и получаем ответ
+        # Вызываем следующий middleware/обработчик
         response = await call_next(request)
 
-        # === ПРАВИЛЬНЫЙ ПЕРЕХВАТ ТЕЛА ОТВЕТА ===
-        # Для FastAPI нужно использовать response.body только после рендеринга
-        # Но лучше перехватить на уровне получения chunk'ов
-
-        # Создаем кастомный response для перехвата
-        original_response = response
-        response_body_chunks = []
-
-        async def body_iterator():
-            if hasattr(original_response, "body_iterator"):
-                async for chunk in original_response.body_iterator:
-                    response_body_chunks.append(chunk)
-                    yield chunk
-            elif hasattr(original_response, "body"):
-                chunk = original_response.body
-                response_body_chunks.append(chunk)
-                yield chunk
-            else:
-                yield b""
-
-        # Создаем новый response с перехваченным body
-        response = Response(
-            content=body_iterator(),
-            status_code=original_response.status_code,
-            headers=dict(original_response.headers),
-            media_type=original_response.media_type
-        )
+        # === ПЕРЕХВАТ ТЕЛА ОТВЕТА ДЛЯ FastAPI ===
+        # Для стандартных ответов FastAPI
+        if hasattr(response, "body") and response.body:
+            try:
+                if isinstance(response.body, bytes):
+                    body_content = response.body
+                    try:
+                        decoded = body_content.decode("utf-8")
+                        if decoded.strip():
+                            try:
+                                response_body = json.loads(decoded)
+                            except json.JSONDecodeError:
+                                response_body = decoded
+                    except Exception:
+                        response_body = "<binary_response>"
+                elif isinstance(response.body, str):
+                    response_body = response.body
+            except Exception as e:
+                response_body = f"<error_reading_response: {str(e)}>"
+                logger.error(f"Error reading response body: {e}")
 
     except Exception as e:
         logger.exception("Unhandled exception in request flow")
@@ -80,24 +74,6 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
 
     process_time = time.time() - start_time
 
-    # === После обработки запроса извлекаем тело ответа ===
-    if response_body is None and 'response_body_chunks' in locals():
-        try:
-            # Собираем все chunks в одно тело
-            full_response_body = b"".join(response_body_chunks)
-            if full_response_body:
-                try:
-                    decoded = full_response_body.decode("utf-8")
-                    if decoded.strip():
-                        try:
-                            response_body = json.loads(decoded)
-                        except json.JSONDecodeError:
-                            response_body = decoded
-                except Exception:
-                    response_body = "<binary_response>"
-        except Exception as e:
-            response_body = f"<error_reading_response: {str(e)}>"
-
     # === Маскировка чувствительных данных ===
     safe_request_body = mask_sensitive_data(request_body)
     safe_response_body = mask_sensitive_data(response_body)
@@ -105,7 +81,7 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
     # === Логирование ===
     method = request.method
     endpoint = request.url.path
-    status_code = response.status_code
+    status_code = response.status_code if response else 500
 
     try:
         if hasattr(request.state, "user"):
