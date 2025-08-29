@@ -171,7 +171,7 @@ async def login(request: Request, username: str, password: str):
 @app.post("/users/", response_model=schemas.UserResponse)
 async def create_user(user: schemas.UserCreate, db: Session = Depends(get_db),
                       current_user: dict = Depends(get_current_user)):
-    logger.info(f"Creating new user: {user.username}")
+    logger.info(f"Creating new user: {user.name}")
 
     db_user = models.User(**user.dict())
     db.add(db_user)
