@@ -16,38 +16,46 @@ def setup_logger():
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
 
-    # JSON логгер для Elasticsearch
+    # JSON логгер для Elasticsearch - ТОЛЬКО JSON!
     json_handler = RotatingFileHandler(
-        filename=os.path.join(LOG_DIR, "app.log"),
-        maxBytes=10 * 1024 * 1024,  # 10MB
+        filename=os.path.join(LOG_DIR, "app.json.log"),
+        maxBytes=10 * 1024 * 1024,
         backupCount=5,
         encoding='utf-8'
     )
+    # Важно: НЕ ставим formatter для JSON!
     logger.addHandler(json_handler)
 
-    # Стандартный логгер для текстовых логов (оставляем для обратной совместимости)
+    # Отдельный логгер для текстовых логов
+    text_logger = logging.getLogger("text")
+    text_logger.setLevel(logging.INFO)
+    for handler in text_logger.handlers[:]:
+        text_logger.removeHandler(handler)
+
     text_handler = RotatingFileHandler(
-        filename="app.log",  # корневой app.log
+        filename="app.log",
         maxBytes=10 * 1024 * 1024,
         backupCount=5,
         encoding='utf-8'
     )
     text_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     text_handler.setFormatter(text_formatter)
-    logger.addHandler(text_handler)
+    text_logger.addHandler(text_handler)
 
-    # Console handler для дебага
+    # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
+    text_logger.addHandler(console_handler)
 
     return logger
 
 
 def log_request(user: str, method: str, endpoint: str, status: int,
                 details: str = "", request_body: dict = None, response_body: dict = None):
+    # JSON данные для Elasticsearch
     log_data = {
         "timestamp": datetime.now().isoformat(),
         "level": "INFO",
@@ -65,8 +73,14 @@ def log_request(user: str, method: str, endpoint: str, status: int,
     # Убираем None значения
     log_data = {k: v for k, v in log_data.items() if v is not None}
 
-    logger = logging.getLogger("app")
-    logger.info(json.dumps(log_data))
+    # Пишем JSON в app.json.log
+    json_logger = logging.getLogger("app")
+    json_logger.info(json.dumps(log_data))
+
+    # Пишем текстовый лог в app.log
+    text_logger = logging.getLogger("text")
+    text_logger.info(
+        f"[User: {user}] [Method: {method}] [Endpoint: {endpoint}] [Status: {status}] [Details: {details}]")
 
 
 # Инициализация при импорте

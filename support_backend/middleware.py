@@ -9,7 +9,7 @@ from auth import get_current_user
 async def log_requests_middleware(request: Request, call_next: Callable[..., Response]) -> Response:
     start_time = time.time()
 
-    # Получаем тело запроса
+    # Получаем тело запроса ДО обработки
     request_body = await request.body()
     request_body_json = None
 
@@ -95,7 +95,6 @@ async def log_requests_middleware(request: Request, call_next: Callable[..., Res
     details = f"client_ip: {client_ip}, process_time: {process_time:.3f}s"
 
     # Логируем
-    from logger import log_request
     log_request(
         user=user,
         method=method,
