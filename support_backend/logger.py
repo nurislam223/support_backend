@@ -1,43 +1,77 @@
+# logger.py
 import logging
 import json
 from datetime import datetime
 import os
 from logging.handlers import RotatingFileHandler
+from typing import Any
 
+# === НАСТРОЙКИ ===
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
+
+LOG_FILE_PATH = os.path.join(LOG_DIR, "app.json.log")
+
+# Чувствительные поля
+SENSITIVE_KEYS = {"password", "passwd", "secret", "token", "api_key", "authorization", "refresh_token"}
+
+
+def mask_sensitive_data(data, keys=SENSITIVE_KEYS):
+    """Рекурсивно маскирует чувствительные данные."""
+    if isinstance(data, dict):
+        return {
+            k: "***MASKED***" if k.lower() in keys else mask_sensitive_data(v, keys)
+            for k, v in data.items()
+        }
+    elif isinstance(data, list):
+        return [mask_sensitive_data(item, keys) for item in data]
+    else:
+        return data
+
+
+class JSONFormatter:
+    """Кастомный JSON-форматтер для логов"""
+    def format(self, record: logging.LogRecord) -> str:
+        log_data = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": record.levelname,
+            "service": "support-backend",
+            "logger": record.name,
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+            "message": record.getMessage(),
+        }
+        # Дополнительные поля из extra
+        if hasattr(record, "extra"):
+            log_data.update(record.extra)
+        return json.dumps(log_data, ensure_ascii=False, default=str)
 
 
 def setup_logger():
     logger = logging.getLogger("app")
     logger.setLevel(logging.INFO)
 
-    # Удаляем старые обработчики
+    # Очищаем старые обработчики
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
-        print(f"🗑️ Удалён handler: {handler}")  # Отладка
 
-    # Создаём папку
-    LOG_DIR = "logs"
-    os.makedirs(LOG_DIR, exist_ok=True)
-    print(f"📁 Папка {LOG_DIR} существует: {os.path.exists(LOG_DIR)}")
-
-    # JSON handler
-    json_log_path = os.path.join(LOG_DIR, "app.json.log")
+    # === 1. JSON в файл (для Logstash) ===
     try:
-        json_handler = RotatingFileHandler(
-            filename=json_log_path,
-            maxBytes=10 * 1024 * 1024,
+        file_handler = RotatingFileHandler(
+            filename=LOG_FILE_PATH,
+            maxBytes=10 * 1024 * 1024,  # 10 MB
             backupCount=5,
             encoding='utf-8'
         )
-        logger.addHandler(json_handler)
-        print(f"✅ JSON handler добавлен: {json_handler}")
-        print(f"📄 JSON лог будет писаться в: {json_log_path}")
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(JSONFormatter())
+        logger.addHandler(file_handler)
+        print(f"✅ JSON логгер настроен: {LOG_FILE_PATH}")
     except Exception as e:
-        print(f"❌ Ошибка при создании JSON handler: {e}")
+        print(f"❌ Ошибка при создании file handler: {e}")
 
-    # Console handler
+    # === 2. Консоль (опционально, для отладки) ===
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     console_formatter = logging.Formatter('%(levelname)s - %(message)s')
@@ -45,61 +79,39 @@ def setup_logger():
     logger.addHandler(console_handler)
     print(f"✅ Console handler добавлен")
 
-    # Проверим, можем ли мы записать
-    logger.info("🔧 setup_logger: тестовая запись в логгер 'app'")
+    # Тестовая запись
+    logger.info("🔧 Logger initialized", extra={"event": "startup"})
 
     return logger
 
-SENSITIVE_KEYS = {"password", "passwd", "secret", "token", "api_key", "authorization", "refresh_token"}
 
+def log_request(
+    user: str,
+    method: str,
+    endpoint: str,
+    status: int,
+    details: str = "",
+    request_body: Any = None,
+    response_body: Any = None
+):
+    """Логирует HTTP-запрос в JSON-файл"""
+    logger = logging.getLogger("app")
 
-def mask_sensitive_data(data, keys=SENSITIVE_KEYS):
-    """
-    Рекурсивно маскирует чувствительные поля в словаре или списке.
-    """
-    if isinstance(data, dict):
-        result = {}
-        for k, v in data.items():
-            if k.lower() in keys:
-                result[k] = "***MASKED***"
-            else:
-                result[k] = mask_sensitive_data(v, keys)
-        return result
-    elif isinstance(data, list):
-        return [mask_sensitive_data(item, keys) for item in data]
-    else:
-        return data
+    # Маскируем чувствительные данные
+    safe_request = mask_sensitive_data(request_body)
+    safe_response = mask_sensitive_data(response_body)
 
-def log_request(user: str, method: str, endpoint: str, status: int,
-                details: str = "", request_body: dict = None, response_body: dict = None):
-    print("🎯 log_request вызван!")  # ← ЭТО ДОЛЖНО БЫТЬ В КОНСОЛИ
-
-    log_data = {
-        "timestamp": datetime.now().isoformat(),
-        "level": "INFO",
-        "service": "support-backend",
-        "user": user,
-        "method": method,
-        "endpoint": endpoint,
-        "status_code": status,
-        "details": details,
-        "request_body": request_body,
-        "response_body": response_body,
-        "log_type": "http_request"
+    extra = {
+        "extra": {
+            "user": user,
+            "method": method,
+            "endpoint": endpoint,
+            "status_code": status,
+            "details": details,
+            "request_body": safe_request,
+            "response_body": safe_response,
+            "log_type": "http_request"
+        }
     }
-    log_data = {k: v for k, v in log_data.items() if v is not None}
 
-    json_line = json.dumps(log_data, ensure_ascii=False)
-
-    # Пишем в логгер "app"
-    json_logger = logging.getLogger("app")
-    print(f"📝 Пишем в логгер 'app': {json_line}")  # Отладка
-    print(f"📊 Handlers у логгера 'app': {json_logger.handlers}")  # Отладка
-
-    json_logger.info(json_line)
-
-    # Текстовый лог
-    text_logger = logging.getLogger("text")
-    text_logger.info(
-        f"[User: {user}] [Method: {method}] [Endpoint: {endpoint}] [Status: {status}] [Details: {details}]"
-    )
+    logger.info("HTTP request completed", extra=extra)
