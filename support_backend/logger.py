@@ -1,79 +1,76 @@
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import json
+from datetime import datetime
 
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 
-LOG_FORMAT = "%(asctime)s - %(levelname)s - [User: %(user)s] [Method: %(method)s] [Endpoint: %(endpoint)s] [Status: %(status)s] [Details: %(message)s]"
-
-class ContextualFilter(logging.Filter):
-    def filter(self, record):
-        if not hasattr(record, 'user'):
-            record.user = '-'
-        if not hasattr(record, 'method'):
-            record.method = '-'
-        if not hasattr(record, 'endpoint'):
-            record.endpoint = '-'
-        if not hasattr(record, 'status'):
-            record.status = '-'
-        return True
 
 def setup_logger():
-    logger = logging.getLogger()
+    logger = logging.getLogger("app")
     logger.setLevel(logging.INFO)
+
+    # Очищаем существующие handlers чтобы избежать дублирования
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
 
-    formatter = logging.Formatter(LOG_FORMAT)
-
+    # JSON формат для Elasticsearch
     file_handler = RotatingFileHandler(
-        filename=os.path.join(LOG_DIR, "app.log"),
+        filename=os.path.join(LOG_DIR, "app.json.log"),
         maxBytes=10 * 1024 * 1024,
         backupCount=5,
         encoding='utf-8'
     )
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
 
+    # Простой handler для консоли
     console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
+    console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(console_formatter)
+
+    logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
-    logger.addFilter(ContextualFilter())
     return logger
 
-def log_request(user: str, method: str, endpoint: str, status: int, details: str = "", body: dict = None):
-    extra = {
+
+def log_request(user: str, method: str, endpoint: str, status: int, details: str = "", request_body: dict = None,
+                response_body: dict = None):
+    log_data = {
+        "timestamp": datetime.now().isoformat(),
+        "level": "INFO",
+        "service": "support-backend",
+        "type": "http_request",
         "user": user,
         "method": method,
         "endpoint": endpoint,
-        "status": status
+        "status_code": status,
+        "details": details,
+        "request_body": request_body,
+        "response_body": response_body,
+        "log_type": "application"
     }
 
-    if body:
-        details += f" Body: {body}"
+    # Убираем None значения для чистоты JSON
+    log_data = {k: v for k, v in log_data.items() if v is not None}
 
-    logging.info(details, extra=extra)
+    logger = logging.getLogger("app")
+    logger.info(json.dumps(log_data))
 
+
+# Инициализируем логгер при импорте
+logger = setup_logger()
 
 # --- Пример использования ---
 if __name__ == "__main__":
-    logger = setup_logger()
-
     # Пример лога с телом запроса
     log_request(
         user="admin",
         method="POST",
         endpoint="/api/users",
-        details="User created",
-        body={"username": "john_doe", "email": "john@example.com"}
-    )
-
-    # Пример GET-запроса без тела
-    log_request(
-        user="guest",
-        method="GET",
-        endpoint="/api/status",
-        details="System status checked"
+        status=201,
+        details="User created successfully",
+        request_body={"username": "john_doe", "email": "john@example.com"},
+        response_body={"id": 123, "username": "john_doe"}
     )

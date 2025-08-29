@@ -1,4 +1,4 @@
-from fastapi import Request, Response, HTTPException
+from fastapi import Request, Response
 from typing import Callable
 import json
 import time
@@ -11,19 +11,18 @@ async def log_requests_middleware(request: Request, call_next: Callable[..., Res
 
     # Получаем тело запроса ДО обработки
     request_body = await request.body()
-    decoded_request_body = ""
+    request_body_json = None
 
     if request_body:
         try:
-            decoded_request_body = request_body.decode("utf-8")
-            # Пробуем парсить как JSON для красивого логирования
-            try:
-                json_request = json.loads(decoded_request_body)
-                decoded_request_body = json.dumps(json_request, ensure_ascii=False)
-            except:
-                pass  # Оставляем как есть если не JSON
+            decoded_body = request_body.decode("utf-8")
+            if decoded_body.strip():  # Если тело не пустое
+                try:
+                    request_body_json = json.loads(decoded_body)
+                except json.JSONDecodeError:
+                    request_body_json = decoded_body  # Сохраняем как текст если не JSON
         except Exception as e:
-            decoded_request_body = f"<failed to decode request body: {str(e)}>"
+            request_body_json = f"<failed to decode: {str(e)}>"
 
     # Восстанавливаем тело запроса для дальнейшей обработки
     async def receive():
@@ -32,15 +31,18 @@ async def log_requests_middleware(request: Request, call_next: Callable[..., Res
     request._receive = receive
 
     # Получаем пользователя
+    user = "-"
     try:
-        # Попробуем аутентифицировать пользователя для логирования
+        current_user = await get_current_user(request)
+        user = current_user.get("username", "-")
+    except Exception:
+        # Если аутентификация не удалась, пробуем получить из заголовков
         try:
-            current_user = await get_current_user(request)
-            user = current_user.get("username", "-")
+            auth_header = request.headers.get("authorization", "")
+            if auth_header and auth_header.startswith("Bearer "):
+                user = "authenticated"
         except:
-            user = "-"
-    except:
-        user = "-"
+            pass
 
     method = request.method
     endpoint = request.url.path
@@ -52,11 +54,11 @@ async def log_requests_middleware(request: Request, call_next: Callable[..., Res
     process_time = time.time() - start_time
 
     # Получаем тело ответа
-    response_body = b""
-    decoded_response_body = ""
+    response_body_json = None
 
     if hasattr(response, 'body_iterator'):
         # Для streaming responses
+        response_body = b""
         async for chunk in response.body_iterator:
             response_body += chunk
 
@@ -67,39 +69,44 @@ async def log_requests_middleware(request: Request, call_next: Callable[..., Res
             headers=dict(response.headers),
             media_type=response.media_type
         )
+
+        if response_body:
+            try:
+                decoded_body = response_body.decode("utf-8")
+                if decoded_body.strip():
+                    try:
+                        response_body_json = json.loads(decoded_body)
+                    except json.JSONDecodeError:
+                        response_body_json = decoded_body
+            except Exception as e:
+                response_body_json = f"<failed to decode: {str(e)}>"
+
     elif hasattr(response, 'body'):
         # Для обычных responses
         response_body = getattr(response, 'body', b"")
-
-    if response_body:
-        try:
-            decoded_response_body = response_body.decode("utf-8")
-            # Пробуем парсить как JSON для красивого логирования
+        if response_body:
             try:
-                json_response = json.loads(decoded_response_body)
-                decoded_response_body = json.dumps(json_response, ensure_ascii=False)
-            except:
-                pass  # Оставляем как есть если не JSON
-        except Exception as e:
-            decoded_response_body = f"<failed to decode response body: {str(e)}>"
+                decoded_body = response_body.decode("utf-8")
+                if decoded_body.strip():
+                    try:
+                        response_body_json = json.loads(decoded_body)
+                    except json.JSONDecodeError:
+                        response_body_json = decoded_body
+            except Exception as e:
+                response_body_json = f"<failed to decode: {str(e)}>"
 
-    # Формируем детали для логирования
-    details = {
-        "client_ip": client_ip,
-        "process_time": f"{process_time:.3f}s",
-        "request_headers": dict(request.headers),
-        "request_body": decoded_request_body,
-        "response_body": decoded_response_body,
-        "response_headers": dict(response.headers)
-    }
+    # Формируем детали
+    details = f"IP: {client_ip} | Time: {process_time:.3f}s"
 
-    # Логируем
+    # Логируем в JSON формате
     log_request(
         user=user,
         method=method,
         endpoint=endpoint,
         status=response.status_code,
-        details=json.dumps(details, ensure_ascii=False)
+        details=details,
+        request_body=request_body_json,
+        response_body=response_body_json
     )
 
     return response
