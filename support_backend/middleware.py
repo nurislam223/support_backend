@@ -68,8 +68,27 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
         await request.scope["fastapi.original_send"](message)
 
     # Сохраняем оригинальный send
+    response_body = []
+
+    async def send_wrapper(message):
+        if message["type"] == "http.response.body":
+            if message.get("body"):
+                response_body.append(message["body"])
+        elif message["type"] == "http.response.chunk":
+            if message.get("chunk"):
+                response_body.append(message["chunk"])
+        await original_send(message)
+
+    # Только если 'send' присутствует в scope
+    if "send" not in request.scope:
+        # Нет send — вероятно, фоновая задача или предзагрузка
+        return await call_next(request)
+
+    original_send = request.scope["send"]
+
+    # Устанавливаем обёртку только один раз
     if "fastapi.original_send" not in request.scope:
-        request.scope["fastapi.original_send"] = request.scope["send"]
+        request.scope["fastapi.original_send"] = original_send
         request.scope["send"] = send_wrapper
 
     # === Обработка запроса ===
