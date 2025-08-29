@@ -8,7 +8,7 @@ import models
 import schemas
 from database import SessionLocal, engine
 from auth import get_current_user, create_access_token, authenticate_user
-import logger
+from logger import setup_logger
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from middleware import log_requests_middleware
@@ -25,7 +25,7 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
+setup_logger()
 # Создаем таблицы в БД
 models.Base.metadata.create_all(bind=engine)
 
