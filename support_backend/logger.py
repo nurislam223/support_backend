@@ -100,24 +100,34 @@ def log_request(
 ):
     logger = logging.getLogger("app")
 
+    # Основное сообщение
+    base_message = f"HTTP {method} {endpoint} - {status} - User: {user}"
+
+    # Добавляем тела запросов/ответов в message
+    full_message = base_message
+    if request_body:
+        full_message += f" | Request: {json.dumps(mask_sensitive_data(request_body), ensure_ascii=False)}"
+    if response_body:
+        full_message += f" | Response: {json.dumps(mask_sensitive_data(response_body), ensure_ascii=False)}"
+    if details:
+        full_message += f" | {details}"
+
     extra_data = {
         "user": user,
         "method": method,
         "endpoint": endpoint,
         "status_code": status,
         "details": details,
-        "request_body": request_body,
-        "response_body": response_body,
         "log_type": "http_request"
+        # Не включаем request_body и response_body в extra - они теперь в message
     }
 
-    # Создаем новую запись с extra данными
     log_record = logging.LogRecord(
         name="app",
         level=logging.INFO,
         pathname=__file__,
         lineno=0,
-        msg=f"HTTP {method} {endpoint} - {status}",
+        msg=full_message,
         args=(),
         exc_info=None
     )
