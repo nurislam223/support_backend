@@ -12,43 +12,41 @@ def setup_logger():
     logger = logging.getLogger("app")
     logger.setLevel(logging.INFO)
 
-    # Очистка предыдущих handlers
+    # Удаляем старые обработчики
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
+        print(f"🗑️ Удалён handler: {handler}")  # Отладка
 
-    # JSON логгер для Elasticsearch - ТОЛЬКО JSON!
-    json_handler = RotatingFileHandler(
-        filename=os.path.join(LOG_DIR, "app.json.log"),
-        maxBytes=10 * 1024 * 1024,
-        backupCount=5,
-        encoding='utf-8'
-    )
-    # Важно: НЕ ставим formatter для JSON!
-    logger.addHandler(json_handler)
+    # Создаём папку
+    LOG_DIR = "logs"
+    os.makedirs(LOG_DIR, exist_ok=True)
+    print(f"📁 Папка {LOG_DIR} существует: {os.path.exists(LOG_DIR)}")
 
-    # Отдельный логгер для текстовых логов
-    text_logger = logging.getLogger("text")
-    text_logger.setLevel(logging.INFO)
-    for handler in text_logger.handlers[:]:
-        text_logger.removeHandler(handler)
-
-    text_handler = RotatingFileHandler(
-        filename="app.log",
-        maxBytes=10 * 1024 * 1024,
-        backupCount=5,
-        encoding='utf-8'
-    )
-    text_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    text_handler.setFormatter(text_formatter)
-    text_logger.addHandler(text_handler)
+    # JSON handler
+    json_log_path = os.path.join(LOG_DIR, "app.json.log")
+    try:
+        json_handler = RotatingFileHandler(
+            filename=json_log_path,
+            maxBytes=10 * 1024 * 1024,
+            backupCount=5,
+            encoding='utf-8'
+        )
+        logger.addHandler(json_handler)
+        print(f"✅ JSON handler добавлен: {json_handler}")
+        print(f"📄 JSON лог будет писаться в: {json_log_path}")
+    except Exception as e:
+        print(f"❌ Ошибка при создании JSON handler: {e}")
 
     # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
-    console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    console_formatter = logging.Formatter('%(levelname)s - %(message)s')
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
-    text_logger.addHandler(console_handler)
+    print(f"✅ Console handler добавлен")
+
+    # Проверим, можем ли мы записать
+    logger.info("🔧 setup_logger: тестовая запись в логгер 'app'")
 
     return logger
 
