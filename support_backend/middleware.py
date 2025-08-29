@@ -128,6 +128,10 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
 
     # === Логирование ===
     details = f"client_ip: {client_ip}, process_time: {process_time:.3f}s"
+    print("🟩 MIDDLEWARE: Вызов log_request")
+    print(f"  → user={user}, method={method}, endpoint={endpoint}, status={response.status_code}")
+    print(f"  → request_body (safe): {safe_request_body}")
+    print(f"  → response_body (safe): {safe_response_body}")
     log_request(
         user=user,
         method=method,
