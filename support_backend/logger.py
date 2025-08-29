@@ -18,7 +18,7 @@ def setup_logger():
 
     # JSON логгер для Elasticsearch
     json_handler = RotatingFileHandler(
-        filename=os.path.join(LOG_DIR, "app.json.log"),
+        filename=os.path.join(LOG_DIR, "app.log"),
         maxBytes=10 * 1024 * 1024,  # 10MB
         backupCount=5,
         encoding='utf-8'
