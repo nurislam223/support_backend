@@ -72,7 +72,8 @@ def mask_sensitive_data(data, keys=SENSITIVE_KEYS):
 
 def log_request(user: str, method: str, endpoint: str, status: int,
                 details: str = "", request_body: dict = None, response_body: dict = None):
-    # JSON данные для Elasticsearch
+    print("🎯 log_request вызван!")  # ← ЭТО ДОЛЖНО БЫТЬ В КОНСОЛИ
+
     log_data = {
         "timestamp": datetime.now().isoformat(),
         "level": "INFO",
@@ -86,16 +87,19 @@ def log_request(user: str, method: str, endpoint: str, status: int,
         "response_body": response_body,
         "log_type": "http_request"
     }
-
-    # Убираем None значения
     log_data = {k: v for k, v in log_data.items() if v is not None}
 
-    # Пишем JSON в app.json.log
-    json_logger = logging.getLogger("app")
-    json_logger.info(json.dumps(log_data))
+    json_line = json.dumps(log_data, ensure_ascii=False)
 
-    # Пишем текстовый лог в app.log
+    # Пишем в логгер "app"
+    json_logger = logging.getLogger("app")
+    print(f"📝 Пишем в логгер 'app': {json_line}")  # Отладка
+    print(f"📊 Handlers у логгера 'app': {json_logger.handlers}")  # Отладка
+
+    json_logger.info(json_line)
+
+    # Текстовый лог
     text_logger = logging.getLogger("text")
     text_logger.info(
-        f"[User: {user}] [Method: {method}] [Endpoint: {endpoint}] [Status: {status}] [Details: {details}]")
-
+        f"[User: {user}] [Method: {method}] [Endpoint: {endpoint}] [Status: {status}] [Details: {details}]"
+    )
