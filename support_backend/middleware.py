@@ -14,13 +14,10 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
     # === Захват тела запроса ===
     request_body = None
     try:
-        # Читаем тело запроса только если это не GET/HEAD и есть content-length
         if request.method not in ("GET", "HEAD") and request.headers.get("content-length"):
             body = await request.body()
-            # Сохраняем для повторного использования
             request._body = body
 
-            # Парсим JSON если возможно
             try:
                 decoded = body.decode("utf-8")
                 if decoded.strip():
@@ -30,8 +27,6 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
                         request_body = decoded
             except Exception:
                 request_body = "<binary_data>"
-        else:
-            request_body = None
     except Exception as e:
         request_body = f"<error_reading_body: {str(e)}>"
 
@@ -39,9 +34,30 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
     user = "anonymous"
     client_ip = request.client.host if request.client else "-"
 
-    # === Обработка запроса ===
+    # === Обработка запроса и перехват ответа ===
+    response_body = None
     try:
+        # Вызываем следующий middleware/обработчик
         response = await call_next(request)
+
+        # === ПЕРЕХВАТ ТЕЛА ОТВЕТА ===
+        # Для этого нам нужно прочитать response.body
+        if hasattr(response, 'body') and response.body:
+            try:
+                response_body_bytes = response.body
+                if response_body_bytes:
+                    try:
+                        decoded = response_body_bytes.decode("utf-8")
+                        if decoded.strip():
+                            try:
+                                response_body = json.loads(decoded)
+                            except json.JSONDecodeError:
+                                response_body = decoded
+                    except Exception:
+                        response_body = "<binary_response>"
+            except Exception as e:
+                response_body = f"<error_reading_response: {str(e)}>"
+
     except Exception as e:
         logger.exception("Unhandled exception in request flow")
         response = Response(
@@ -49,23 +65,7 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
             status_code=500,
             media_type="application/json"
         )
-
-    # === Захват тела ответа ===
-    response_body = None
-    try:
-        # Для JSON ответов
-        if hasattr(response, "body") and response.body:
-            try:
-                decoded = response.body.decode("utf-8")
-                if decoded.strip():
-                    try:
-                        response_body = json.loads(decoded)
-                    except json.JSONDecodeError:
-                        response_body = decoded
-            except Exception:
-                response_body = "<binary_response>"
-    except Exception as e:
-        response_body = f"<error_reading_response: {str(e)}>"
+        response_body = {"detail": "Internal Server Error"}
 
     process_time = time.time() - start_time
 
@@ -78,7 +78,6 @@ async def log_requests_middleware(request: Request, call_next: Callable) -> Resp
     endpoint = request.url.path
     status_code = response.status_code
 
-    # Пытаемся получить пользователя из request.state (если установлено в get_current_user)
     try:
         if hasattr(request.state, "user"):
             user = request.state.user.get("username", "authenticated")
