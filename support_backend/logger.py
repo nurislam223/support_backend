@@ -99,6 +99,3 @@ def log_request(user: str, method: str, endpoint: str, status: int,
     text_logger.info(
         f"[User: {user}] [Method: {method}] [Endpoint: {endpoint}] [Status: {status}] [Details: {details}]")
 
-
-# Инициализация при импорте
-logger = setup_logger()
