@@ -144,6 +144,29 @@ async def update_user(user_id: int, user: schemas.UserUpdate, db: Session = Depe
     db.refresh(db_user)
     return db_user
 
+@app.patch("/users/{user_id}", response_model=schemas.UserResponse)
+async def partial_update_user(
+        user_id: int,
+        user: schemas.UserUpdate,
+        db: Session = Depends(get_db),
+        current_user: dict = Depends(get_current_user)
+):
+    # Находим пользователя
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Получаем только переданные поля (исключаем None значения)
+    update_data = user.dict(exclude_unset=True)
+
+    # Обновляем только переданные поля
+    for key, value in update_data.items():
+        setattr(db_user, key, value)
+
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
 
 @app.delete("/users/{user_id}")
 async def delete_user(user_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
