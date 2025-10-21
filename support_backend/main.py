@@ -115,7 +115,7 @@ async def create_user(user: schemas.UserCreate, db: Session = Depends(get_db),
     return db_user
 
 
-@app.get("/users/", response_model=List[schemas.UserResponse])
+@app.get("/users/")
 async def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db),
                      current_user: dict = Depends(get_current_user)):
     users = db.query(models.User).offset(skip).limit(limit).all()
